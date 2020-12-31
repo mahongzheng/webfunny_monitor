@@ -15,8 +15,8 @@ module.exports = (customerWarningCallback) => {
             Common.startReceiveMsg()
         }
         // 将项目的webMonitorId列表放入全局变量，并放入bin/webMonitorIdList.js文件中
-        Common.setWebMonitorIdList()
-        Common.setStopWebMonitorIdList()
+        // Common.setWebMonitorIdList()
+        // Common.setStopWebMonitorIdList()
     }, 3000)
     /**
      * 2秒后开始进行第一次分析
@@ -26,7 +26,9 @@ module.exports = (customerWarningCallback) => {
         // Common.calculateCountByDayForTenMinutes(0)
         // TimerCalculateController.calculateCountByDay(0)
         // TimerCalculateController.calculateCountByHour(1, customerWarningCallback)
-    }, 2000)
+        // Common.restartServer()
+        // Common.createTable()
+    }, 15000)
     Common.consoleLogo()
     /** * 定时任务  开始 */
     setTimeout(() => {
