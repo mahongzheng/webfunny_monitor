@@ -1,18 +1,23 @@
 const Koa = require('koa')
 // 路由
 const bodyParser = require('koa-bodyparser')
-const httpRoute = require('./routes')
-const wsRoute = require('./routes/ws')
-const log = require("./config/log")
-let WebSocket = require("koa-websocket")
-const statusCode = require('./util/status-code')
-const err = require('./middlreware/error')
-const app = WebSocket(new Koa())
+const centerRoute = require('./servers/center/router')
+const monitorRoute = require('./servers/monitor/routes')
+const eventRoute = require('./servers/event/routes')
+const statusCode = require('./utils/status-code')
+const auth = require('./middlreware/auth')
+const logger = require('./middlreware/logger')
+const sqlCheck = require('./middlreware/sqlCheck')
+const cacheData = require('./middlreware/cacheData')
+const loggerUpload = require('./middlreware/loggerUpload')
+const WebfunnyConfig = require('./webfunny.config')
+const { headers } = WebfunnyConfig.otherConfig.extraCors
+const app = new Koa()
 
 app.use(async (ctx, next) => {
-    ctx.set("Access-Control-Allow-Origin", "*")
+    ctx.set("Access-Control-Allow-Origin", ctx.header.origin || "*")
     ctx.set("Access-Control-Allow-Methods", "PUT,POST,GET,DELETE,OPTIONS")
-    ctx.set("Access-Control-Allow-Headers", "*")
+    ctx.set("Access-Control-Allow-Headers", "access-token,webfunny-secret-code,x-requested-with,Content-Type,wf-t" + headers)
     ctx.set("Access-Control-Allow-Credentials", true)
     ctx.set("X-Powered-By", "3.2.1")
     ctx.set("Content-Type", "application/json;charset=utf-8")
@@ -24,37 +29,33 @@ app.use(async (ctx, next) => {
     }
 })
 // 登录校验
-app.use(err())
-
+app.use(auth())
 // middlewares
 app.use(bodyParser({
     enableTypes: ['json', 'form', 'text'],
-    formLimit: "5mb",
-    jsonLimit: "5mb",
-    textLimit: "5mb"
+    formLimit: "50mb",
+    jsonLimit: "50mb",
+    textLimit: "50mb"
 }))
 
-app.use(async (ctx, next) => {
-    const start = new Date()
-    let ms = 0
-    try {
-        await next();
-        ms = new Date() - start
-    } catch (error) {
-        //记录异常日志
-        log.error(ctx, error, ms);
-        ctx.response.status = 500;
-        ctx.body = statusCode.ERROR_500('服务器异常，请检查 logs/error 目录下日志文件', "")
-    }
-})
+// 防sql注入
+app.use(sqlCheck())
+
+// 缓存数据拦截
+app.use(cacheData())
+
+// 错误日志拦截和上报
+app.use(logger())
 
 // routes
-app.use(httpRoute.routes(), httpRoute.allowedMethods())
-app.ws.use(wsRoute.routes(), wsRoute.allowedMethods())
+app.use(centerRoute.routes(), centerRoute.allowedMethods())
+app.use(monitorRoute.routes(), monitorRoute.allowedMethods())
+app.use(eventRoute.routes(), eventRoute.allowedMethods())
 
 // error-handling
 app.on('error', (err, ctx) => {
     console.error('server error', err, ctx)
+    loggerUpload({ error })
 });
 
 module.exports = app
